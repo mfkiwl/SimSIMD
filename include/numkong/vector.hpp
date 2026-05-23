@@ -454,12 +454,10 @@ struct vector_span {
     }
 
     /** @brief Raw byte pointer. */
-    constexpr char *byte_data() noexcept { return data_; }
-    constexpr char const *byte_data() const noexcept { return data_; }
+    constexpr char *byte_data() const noexcept { return data_; }
 
     /** @brief Typed pointer (only valid if contiguous). */
-    constexpr value_type *data() noexcept { return reinterpret_cast<value_type *>(data_); }
-    constexpr value_type const *data() const noexcept { return reinterpret_cast<value_type const *>(data_); }
+    constexpr value_type *data() const noexcept { return reinterpret_cast<value_type *>(data_); }
 
     /** @brief Implicit conversion to const view. */
     constexpr operator vector_view<value_type>() const noexcept {
@@ -468,7 +466,7 @@ struct vector_span {
 
     /** @brief Mutable integral indexing. Signed negatives wrap from end. */
     template <std::integral index_type_>
-    decltype(auto) operator[](index_type_ idx) noexcept {
+    decltype(auto) operator[](index_type_ idx) const noexcept {
         auto i = resolve_index_(idx, dimensions_);
         if constexpr (dimensions_per_value<value_type>() > 1) {
             constexpr auto dims_per_value = dimensions_per_value<value_type>();
@@ -482,36 +480,23 @@ struct vector_span {
         else { return *reinterpret_cast<value_type *>(data_ + static_cast<difference_type>(i) * stride_bytes_); }
     }
 
-    /** @brief Const integral indexing. Signed negatives wrap from end. */
-    template <std::integral index_type_>
-    decltype(auto) operator[](index_type_ idx) const noexcept {
-        return static_cast<vector_view<value_type>>(*this)[idx];
-    }
-
     /** @brief Sub-slice via range. */
-    vector_span operator[](range r) noexcept {
+    vector_span operator[](range r) const noexcept {
         size_type start, stop;
         resolve_range_(r, dimensions_, start, stop);
         auto count = range_extent_(start, stop, r.step);
         return {data_ + static_cast<difference_type>(start) * stride_bytes_, count, stride_bytes_ * r.step};
     }
 
-    /** @brief Const sub-slice via range. */
-    vector_view<value_type> operator[](range r) const noexcept {
-        return static_cast<vector_view<value_type>>(*this)[r];
-    }
-
     /** @brief Select all elements. */
-    vector_span operator[](all_t) noexcept { return *this; }
+    vector_span operator[](all_t) const noexcept { return *this; }
 
-    /** @brief Dimension iterator to beginning. */
-    iterator begin() noexcept { return {*this, 0}; }
-    const_iterator begin() const noexcept { return {*this, 0}; }
+    /** @brief Dimension iterator to beginning. The handle is shallow-const, so iteration yields mutable refs. */
+    iterator begin() const noexcept { return {const_cast<vector_span &>(*this), 0}; }
     const_iterator cbegin() const noexcept { return {*this, 0}; }
 
     /** @brief Dimension iterator to end. */
-    iterator end() noexcept { return {*this, dimensions_}; }
-    const_iterator end() const noexcept { return {*this, dimensions_}; }
+    iterator end() const noexcept { return {const_cast<vector_span &>(*this), dimensions_}; }
     const_iterator cend() const noexcept { return {*this, dimensions_}; }
 
     /** @brief Zero-fill every element. memset on the contiguous fast path,
